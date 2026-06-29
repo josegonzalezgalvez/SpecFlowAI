@@ -1,0 +1,36 @@
+# Node
+node_modules/
+npm-debug.log*
+
+# Next.js
+.next/
+out/
+
+# Logs
+logs/
+*.log
+
+# Environment
+.env
+.env.*
+!.env.example
+
+# CDK
+cdk.out/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
+
+# Coverage
+coverage/
+
+# Turborepo
+.turbo/
+
+infrastructure/node_modules/
+infrastructure/cdk.out/
