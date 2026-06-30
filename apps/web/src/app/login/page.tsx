@@ -1,5 +1,6 @@
 'use client';
 
+import { loginWithEmail, loginWithProvider } from "@/lib/auth";
 import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useIAM } from '@/context/IAMContext';
@@ -19,41 +20,33 @@ export default function LoginPage() {
     }
   }, [isLoggedIn, router]);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setError('');
+    setError("");
+    setIsLoading(true);
 
-    if (!email) {
-      setError('Por favor, ingresa tu correo electrónico.');
-      return;
+    const result = await loginWithEmail(email, password);
+
+    if (result.success && result.user) {
+      login(result.user);
+      router.push("/iam");
+    } else {
+      setError(result.message ?? "Error al iniciar sesión.");
     }
 
-    setIsLoading(true);
-
-    // Simulate network latency for visual high-fidelity feel
-    setTimeout(() => {
-      try {
-        const success = login(email, password);
-        if (success) {
-          router.push('/iam');
-        } else {
-          setError('Credenciales inválidas.');
-        }
-      } catch {
-        setError('Error al iniciar sesión. Inténtalo de nuevo.');
-      } finally {
-        setIsLoading(false);
-      }
-    }, 800);
+    setIsLoading(false);
   };
 
-  const handleSSOLogin = (provider: string) => {
-    setIsLoading(true);
-    setTimeout(() => {
-      login(`${provider.toLowerCase()}@specflow.ai`);
-      router.push('/iam');
-      setIsLoading(false);
-    }, 600);
+  const handleSSOLogin = async (provider: "Google" | "GitHub" | "Microsoft") => {
+  setIsLoading(true);
+
+  const result = await loginWithProvider(provider);
+    if (result.success && result.user) {
+      login(result.user);
+      router.push("/iam");
+    }
+
+    setIsLoading(false);
   };
 
   return (

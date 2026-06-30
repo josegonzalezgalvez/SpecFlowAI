@@ -3,6 +3,9 @@
 /* eslint-disable react-hooks/set-state-in-effect, @typescript-eslint/no-explicit-any, @typescript-eslint/no-unused-vars */
 
 import React, { createContext, useContext, useState, useEffect } from 'react';
+import { AuthorizationService } from '@/auth/AuthorizationService';
+import { modules, roles, profiles as rbacProfiles, rolePermissions } from '@/auth/mockData';
+import type { AuthenticatedUser, PermissionAction } from '@/auth/types';
 
 export type ModuleName =
   | "Proyectos"
@@ -61,7 +64,11 @@ interface IAMContextType {
   permissionsMatrix: PermissionMatrix;
   isLoggedIn: boolean;
   currentUser: { email: string; name: string; role: string } | null;
-  login: (email: string, password?: string) => boolean;
+  authorization: AuthorizationService;
+  rbacUser: AuthenticatedUser | null;
+  can: (moduleId: string, action: PermissionAction) => boolean;
+  visibleModules: ReturnType<AuthorizationService["getVisibleModules"]>;
+  login: (user: { email: string; name: string; role: string }) => void;
   logout: () => void;
   addUser: (user: Omit<User, 'id' | 'lastAccess'>) => void;
   deleteUser: (id: string) => void;
@@ -204,28 +211,10 @@ export function IAMProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
-  const login = (email: string, password?: string): boolean => {
-    // Basic mock authentication: any password works for mock email addresses
-    let name = 'Usuario SpecFlow';
-    let role = 'Visualizador';
-
-    const cleanEmail = email.toLowerCase().trim();
-    if (cleanEmail === 'admin@specflow.ai' || cleanEmail === 'juan.perez@specflow.ai') {
-      name = 'Juan Pérez';
-      role = 'Administrador';
-    } else {
-      const foundUser = users.find(u => u.email.toLowerCase().trim() === cleanEmail);
-      if (foundUser) {
-        name = foundUser.name;
-        role = foundUser.role;
-      }
-    }
-
-    const session = { email: cleanEmail, name, role };
+  const login = (user: { email: string; name: string; role: string }) => {
     setIsLoggedIn(true);
-    setCurrentUser(session);
-    save('sf_session', session);
-    return true;
+    setCurrentUser(user);
+    save('sf_session', user);
   };
 
   const logout = () => {
@@ -235,6 +224,28 @@ export function IAMProvider({ children }: { children: React.ReactNode }) {
       localStorage.removeItem('sf_session');
     }
   };
+
+  const authorization = new AuthorizationService({
+    modules,
+    roles,
+    profiles: rbacProfiles,
+    rolePermissions,
+  });
+
+  const rbacUser: AuthenticatedUser | null = currentUser
+    ? {
+        email: currentUser.email,
+        name: currentUser.name,
+        profileId: currentUser.role === "Administrador" ? "default-admin" : "default-viewer",
+      }
+    : null;
+
+  const can = (moduleId: string, action: PermissionAction) => {
+    if (!rbacUser) return false;
+    return authorization.can(rbacUser, moduleId, action);
+  };
+
+  const visibleModules = rbacUser ? authorization.getVisibleModules(rbacUser) : [];
 
   const addUser = (newUser: Omit<User, 'id' | 'lastAccess'>) => {
     const userWithId: User = {
@@ -321,7 +332,11 @@ export function IAMProvider({ children }: { children: React.ReactNode }) {
         deleteRole,
         addProfile,
         deleteProfile,
-        toggleMatrixPermission
+        toggleMatrixPermission,
+        authorization,
+        rbacUser,
+        can,
+        visibleModules
       }}
     >
       {hydrated ? children : <div className="min-h-screen bg-[#0B0F19]"></div>}
